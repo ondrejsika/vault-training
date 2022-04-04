@@ -1,0 +1,10 @@
+server:
+  ingress:
+    tls:
+    - secretName: vault-tls
+      hosts:
+        - vault.company.com
+    hosts:
+    - host: vault.k8s.sikademo.com
+      paths:
+        - /
