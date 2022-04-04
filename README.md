@@ -39,3 +39,19 @@ Logs
 ```
 make docker-dev-server-logs
 ```
+
+### Test CLI / `vault status`
+
+You need to set `http://127.0.0.1:8200` to environment variable `VAULT_ADDR`.
+
+```bash
+export VAULT_ADDR='http://127.0.0.1:8200'
+```
+
+Now, try:
+
+```bash
+vault status
+```
+
+![](./images/vault-status.png)
