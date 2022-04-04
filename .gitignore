@@ -2,3 +2,5 @@
 
 local.txt
 *.local.txt
+
+*.snap
