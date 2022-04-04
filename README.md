@@ -245,6 +245,44 @@ sleep 60
 slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -n postgres
 ```
 
+### AWS
+
+Enable AWS secret engine
+
+```
+vault secrets enable aws
+```
+
+Prepare AWS keys
+
+```
+export AWS_ACCESS_KEY=...
+export AWS_SECRET_KEY=...
+```
+
+Configure the AWS provider
+
+```
+vault write aws/config/root \
+  access_key=$AWS_ACCESS_KEY \
+  secret_key=$AWS_SECRET_KEY \
+  region=eu-central-1
+```
+
+Create s3 role
+
+```
+vault write aws/roles/s3 \
+  credential_type=iam_user \
+  policy_document=@examples/aws/s3_policy.json
+```
+
+Get credentials
+
+```
+vault read aws/creds/s3
+```
+
 # Production Vault on Kubernetes
 
 Docs:
