@@ -183,3 +183,64 @@ vault delete secret/metadata/first
 ```
 vault kv list secret/
 ```
+
+## Dynamic Secrets
+
+## Database (Postgres)
+
+Run Postgres
+
+```
+make postgres-up
+```
+
+Create role `ro` (read only for all tables)
+
+```
+make postgres-create-ro
+```
+
+Enable `database` secret engine
+
+```
+vault secrets enable database
+```
+
+Configure Postgress connection
+
+```
+vault write database/config/postgresql \
+  plugin_name=postgresql-database-plugin \
+  connection_url="postgresql://{{username}}:{{password}}@127.0.0.1:5432/postgres?sslmode=disable" \
+  allowed_roles=readonly \
+  username="postgres" \
+  password="pg"
+```
+
+Create read-only role
+
+```
+vault write database/roles/readonly \
+    db_name=postgresql \
+    creation_statements=@examples/postgres/readonly.sql \
+    default_ttl=1h \
+    max_ttl=24h
+```
+
+Validate
+
+```
+POSTGRES_USER=...
+POSTGRES_PASSWORD=...
+```
+
+```
+slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -n postgres
+```
+
+Wait one minute & check again:
+
+```
+sleep 60
+slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -n postgres
+```
