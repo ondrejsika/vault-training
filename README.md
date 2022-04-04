@@ -40,6 +40,16 @@ Logs
 make docker-dev-server-logs
 ```
 
+### `~/.vault-token`
+
+If you run Vault locally, your token will be automaticaly save to file `~/.vault-token`.
+
+If you run Vault from Docker, you have to create that file manually:
+
+```bash
+echo root > ~/.vault-token
+```
+
 ### Test CLI / `vault status`
 
 You need to set `http://127.0.0.1:8200` to environment variable `VAULT_ADDR`.
@@ -55,3 +65,11 @@ vault status
 ```
 
 ![](./images/vault-status.png)
+
+If you run Vault in Docker and dont have Vault locally, you can connect to shell using
+
+```
+make docker-dev-server-shell
+```
+
+And just run `vault status`. Everything is configured.
