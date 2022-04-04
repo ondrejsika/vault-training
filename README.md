@@ -247,6 +247,10 @@ slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -
 
 # Production Vault on Kubernetes
 
+Docs:
+
+- [Highly Available Vault Cluster with Integrated Storage (Raft)](https://www.vaultproject.io/docs/platform/k8s/helm/examples/ha-with-raft)
+
 Install production Vault
 
 ```
