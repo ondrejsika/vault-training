@@ -18,3 +18,11 @@ postgres-up:
 
 postgres-create-ro:
 	docker exec -u postgres postgres psql -c "CREATE ROLE \"ro\" NOINHERIT; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"ro\";"
+
+k8s-prod-server:
+	helm repo add hashicorp https://helm.releases.hashicorp.com
+	helm upgrade -- install vault hashicorp/vault \
+		--namespace vault \
+		--create-namespace \
+		-f prod-values-general.yml \
+		-f prod-values-sikademo.yml

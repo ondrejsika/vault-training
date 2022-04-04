@@ -244,3 +244,63 @@ Wait one minute & check again:
 sleep 60
 slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -n postgres
 ```
+
+# Production Vault on Kubernetes
+
+Install production Vault
+
+```
+make prod-server
+```
+
+Init
+
+```
+kubectl exec -ti vault-0 -- vault operator init
+```
+
+Unseal
+
+```
+kubectl exec -ti vault-0 -- vault operator unseal
+```
+
+Add nodes to cluster
+
+```
+kubectl exec -ti vault-1 -- vault operator raft join http://vault-0.vault-internal:8200
+```
+
+and unseal
+
+```
+kubectl exec -ti vault-1 -- vault operator unseal
+```
+
+Do it for the 3rd node:
+
+```
+kubectl exec -ti vault-2 -- vault operator raft join http://vault-0.vault-internal:8200
+kubectl exec -ti vault-2 -- vault operator unseal
+```
+
+Done.
+
+Set environment:
+
+```
+export VAULT_ADDR=...
+export VAULT_TOKEN=...
+```
+
+Check status:
+
+```
+vault status
+```
+
+List raft peers:
+
+```
+vault operator raft list-peers
+```
