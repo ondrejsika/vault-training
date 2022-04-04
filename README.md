@@ -308,3 +308,19 @@ List raft peers:
 ```
 vault operator raft list-peers
 ```
+
+## Backup & Restore
+
+## Backup
+
+```
+vault operator raft snapshot save backup.snap
+```
+
+## Restore
+
+Create new cluster, unseal & login to it.
+
+```
+vault operator raft snapshot restore -force backup.snap
+```
