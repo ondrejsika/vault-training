@@ -26,3 +26,12 @@ k8s-prod-server:
 		--create-namespace \
 		-f prod-values-general.yml \
 		-f prod-values-sikademo.yml
+
+k8s-prod-server-with-injector:
+	helm repo add hashicorp https://helm.releases.hashicorp.com
+	helm upgrade --install vault hashicorp/vault \
+		--namespace vault \
+		--create-namespace \
+		-f prod-values-general.yml \
+		-f prod-values-sikademo.yml \
+		-f prod-values-injector.yml

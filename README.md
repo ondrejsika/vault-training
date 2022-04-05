@@ -365,6 +365,12 @@ vault operator raft snapshot restore -force backup.snap
 
 ## Kubernetes Injector Example
 
+Enable injector
+
+```
+make k8s-prod-server-with-injector
+```
+
 Create kv engine for Kubernetes demo
 
 ```
