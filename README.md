@@ -362,3 +362,78 @@ Create new cluster, unseal & login to it.
 ```
 vault operator raft snapshot restore -force backup.snap
 ```
+
+## Kubernetes Injector Example
+
+Create kv engine for Kubernetes demo
+
+```
+vault secrets enable -path=secret-k8s kv-v2
+```
+
+Put secret
+
+```
+vault kv put secret-k8s/database/config username="foo" password="bar"
+```
+
+Validate secret
+
+```
+vault kv get secret-k8s/database/config
+```
+
+Enable Kubernetes auth backend
+
+```
+vault auth enable kubernetes
+```
+
+Connect the Vault pod
+
+```
+kubectl exec -ti vault-0 -n vault -- sh
+```
+
+Connect Kubernets
+
+```
+vault write auth/kubernetes/config \
+  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
+  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+  issuer="https://kubernetes.default.svc.cluster.local"
+```
+
+Create policy for our app
+
+```
+vault policy write hello ./examples/k8s-injector/policy.hcl
+```
+
+Create role for our app
+
+```
+vault write auth/kubernetes/role/hello \
+  bound_service_account_names=hello \
+  bound_service_account_namespaces=default \
+  policies=hello \
+  ttl=24h
+```
+
+Install App
+
+```
+kubectl apply -f ./examples/k8s-injector
+```
+
+Open port forward and check the app
+
+```
+kubectl port-forward svc/hello 8000:80
+```
+
+See:
+
+- <http://127.0.0.1:8000>
+- <http://127.0.0.1:8000/vault/secrets/database-config.txt>
