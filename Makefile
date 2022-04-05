@@ -21,7 +21,7 @@ postgres-create-ro:
 
 k8s-prod-server:
 	helm repo add hashicorp https://helm.releases.hashicorp.com
-	helm upgrade -- install vault hashicorp/vault \
+	helm upgrade --install vault hashicorp/vault \
 		--namespace vault \
 		--create-namespace \
 		-f prod-values-general.yml \
