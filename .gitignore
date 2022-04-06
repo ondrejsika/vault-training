@@ -4,3 +4,12 @@ local.txt
 *.local.txt
 
 *.snap
+
+# Terraform
+
+.terraform
+terraform.tfvars
+terraform.auto.tfvars
+.terraform.tfstate.lock.info
+*.tfstate
+*.backup
