@@ -223,7 +223,7 @@ Create read-only role
 vault write database/roles/readonly \
     db_name=postgresql \
     creation_statements=@examples/postgres/readonly.sql \
-    default_ttl=1h \
+    default_ttl=2m \
     max_ttl=24h
 ```
 
