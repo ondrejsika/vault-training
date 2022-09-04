@@ -13,3 +13,6 @@ terraform.auto.tfvars
 .terraform.tfstate.lock.info
 *.tfstate
 *.backup
+
+# Infracost
+.infracost
