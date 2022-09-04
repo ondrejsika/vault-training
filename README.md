@@ -227,6 +227,12 @@ vault write database/roles/readonly \
     max_ttl=24h
 ```
 
+Read credentials
+
+```
+vault read database/creds/readonly
+```
+
 Validate
 
 ```
