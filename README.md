@@ -449,3 +449,7 @@ See:
 
 - <http://127.0.0.1:8000>
 - <http://127.0.0.1:8000/vault/secrets/database-config.txt>
+
+## HashiCorp Video about Kubernetes Integration
+
+<https://www.youtube.com/watch?v=xUuJhgDbUJQ&t=26s&ab_channel=HashiCorp>
