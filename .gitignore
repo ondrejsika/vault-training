@@ -3,6 +3,7 @@
 local.txt
 *.local.txt
 
+/tmp
 *.snap
 
 # Terraform
