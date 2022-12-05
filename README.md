@@ -329,6 +329,9 @@ Do it for the 3rd node:
 
 ```
 kubectl exec -ti vault-2 -- vault operator raft join http://vault-0.vault-internal:8200
+```
+
+```
 kubectl exec -ti vault-2 -- vault operator unseal
 ```
 
