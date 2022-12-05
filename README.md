@@ -369,6 +369,24 @@ Create new cluster, unseal & login to it.
 vault operator raft snapshot restore -force backup.snap
 ```
 
+## Backup using Tergum
+
+- Tergum - Backup tool - https://github.com/sikalabs/tergum
+- Blog post about backup - https://ondrej-sika.cz/blog/tergum-v0.30.0
+
+Copy example config & edit token
+
+```
+make tergum-copy-config
+vim tergum.yml
+```
+
+Run backup
+
+```
+tergum backup --config tergum.yml
+```
+
 ## Kubernetes Injector Example
 
 Enable injector
