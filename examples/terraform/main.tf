@@ -4,6 +4,9 @@ terraform {
       source  = "hashicorp/vault"
       version = "3.4.1"
     }
+    random = {
+      source = "hashicorp/random"
+    }
   }
 }
 
@@ -84,33 +87,6 @@ resource "vault_aws_secret_backend_role" "s3" {
   ]
 }
 EOT
-}
-
-resource "vault_identity_entity" "admin" {
-  name = "admin-user"
-  policies = [
-    vault_policy.super-admin.name,
-  ]
-}
-
-resource "vault_identity_entity_alias" "admin" {
-  name           = vault_identity_entity.admin.name
-  mount_accessor = vault_auth_backend.userpass.accessor
-  canonical_id   = vault_identity_entity.admin.id
-}
-
-
-resource "vault_identity_entity" "ondrej" {
-  name = "ondrej-entity"
-  policies = [
-    vault_policy.read-all-secret.name,
-  ]
-}
-
-resource "vault_identity_entity_alias" "ondrej" {
-  name           = "ondrej"
-  mount_accessor = vault_auth_backend.userpass.accessor
-  canonical_id   = vault_identity_entity.ondrej.id
 }
 
 resource "vault_identity_entity" "s3" {
