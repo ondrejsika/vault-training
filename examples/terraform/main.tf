@@ -7,8 +7,17 @@ terraform {
   }
 }
 
+variable "vault_address" {
+  type = string
+}
+
+variable "vault_token" {
+  type = string
+}
+
 provider "vault" {
-  address = "https://vault.k8s.sikademo.com"
+  address = var.vault_address
+  token   = var.vault_token
 }
 
 resource "vault_auth_backend" "userpass" {
