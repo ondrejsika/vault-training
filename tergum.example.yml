@@ -1,0 +1,12 @@
+Meta:
+  SchemaVersion: 3
+Backups:
+  - ID: vault
+    Source:
+      Vault:
+        Addr: http://vault.k8s.sikademo.com
+        Token: REPLACE_ME__TOKEN
+    Targets:
+      - ID: file
+        FilePath:
+          Path: ./tmp/tergum-backup.snap

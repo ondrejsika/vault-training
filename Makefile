@@ -36,6 +36,12 @@ k8s-prod-server-with-injector:
 		-f prod-values-sikademo.yml \
 		-f prod-values-injector.yml
 
+tergum-copy-config:
+	cp tergum.example.yml tergum.yml
+
+tergum-backup:
+	tergum backup -c tergum.yml
+
 fmt:
 	terraform fmt -recursive
 
