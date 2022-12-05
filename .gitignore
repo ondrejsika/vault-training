@@ -6,6 +6,8 @@ local.txt
 /tmp
 *.snap
 
+tergum.yml
+
 # Terraform
 
 .terraform
