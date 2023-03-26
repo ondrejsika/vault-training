@@ -163,7 +163,7 @@ vault kv get -version 3 secret/first
 ### Destroy Static Secret
 
 ```
-vault kv destroy -version 1 secret/first
+vault kv destroy -versions 1 secret/first
 ```
 
 ```
