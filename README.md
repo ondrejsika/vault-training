@@ -460,7 +460,13 @@ Install App
 kubectl apply -f ./examples/k8s-injector
 ```
 
-Open port forward and check the app
+See:
+
+- <https://hello.k8s.sikademo.com>
+- <https://hello.k8s.sikademo.com/vault/secrets/database-config.txt>
+
+
+or pen port forward and check the app
 
 ```
 kubectl port-forward svc/hello 8000:80
