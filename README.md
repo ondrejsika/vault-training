@@ -481,6 +481,50 @@ See:
 
 <https://www.youtube.com/watch?v=xUuJhgDbUJQ&t=26s&ab_channel=HashiCorp>
 
+## Vault OIDC Auth using Keycloak
+
+```
+vault policy write manager examples/oidc/manager.hcl
+```
+
+```
+vault policy write reader examples/oidc/reader.hcl
+```
+
+```
+vault policy list
+```
+
+Enable the Keycloak authentication method in Vault by running the following command:
+
+```
+vault auth enable oidc
+```
+
+Configure the Keycloak provider by specifying the issuer URL, client ID, client secret, and any other necessary parameters. For example:
+
+```
+vault write auth/oidc/config \
+  oidc_discovery_url="https://sso.sikademo.com/realms/example" \
+  oidc_client_id="example" \
+  oidc_client_secret="example" \
+  oidc_scope="openid profile email roles" \
+  default_role="default"
+```
+
+```
+vault write auth/oidc/role/default \
+  bound_audiences="example" \
+  allowed_redirect_uris="http://localhost:8200/ui/vault/auth/oidc/oidc/callback" \
+  allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+  user_claim="sub" \
+  token_policies="reader"
+```
+
+```
+vault login -method=oidc
+```
+
 ## Thank you! & Questions?
 
 That's it. Do you have any questions? **Let's go for a beer!**
