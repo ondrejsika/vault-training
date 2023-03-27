@@ -32,13 +32,17 @@ resource "vault_mount" "kv2-secret" {
   type = "kv-v2"
 }
 
-resource "vault_mount" "aws" {
-  path = "aws"
-  type = "aws"
+variable "aws_access_key" {}
+variable "aws_secret_key" {}
+
+resource "vault_aws_secret_backend" "aws" {
+  path       = "aws"
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
 }
 
 resource "vault_aws_secret_backend_role" "s3" {
-  backend         = vault_mount.aws.path
+  backend         = vault_aws_secret_backend.aws.path
   name            = "s3"
   credential_type = "iam_user"
 
