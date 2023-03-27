@@ -38,7 +38,7 @@ resource "vault_mount" "aws" {
 }
 
 resource "vault_aws_secret_backend_role" "s3" {
-  backend         = "aws"
+  backend         = vault_mount.aws.path
   name            = "s3"
   credential_type = "iam_user"
 
