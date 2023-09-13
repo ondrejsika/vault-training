@@ -20,6 +20,12 @@ Stop: using Ctrl+C
 
 See: <http://127.0.0.1:8200>
 
+Test it
+
+```
+VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault status
+```
+
 ### From Docker
 
 Run
