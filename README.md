@@ -487,6 +487,10 @@ See:
 
 <https://www.youtube.com/watch?v=xUuJhgDbUJQ&t=26s&ab_channel=HashiCorp>
 
+## Vault Secrets Operator
+
+https://developer.hashicorp.com/vault/tutorials/kubernetes/vault-secrets-operator
+
 ## Vault OIDC Auth using Keycloak
 
 ```
