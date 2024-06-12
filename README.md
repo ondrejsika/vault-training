@@ -398,7 +398,8 @@ tergum backup --config tergum.yml
 
 ## Vault Secrets Operator
 
-https://developer.hashicorp.com/vault/tutorials/kubernetes/vault-secrets-operator
+- https://github.com/ondrejsika/vault-secrets-operator-example
+- https://developer.hashicorp.com/vault/tutorials/kubernetes/vault-secrets-operator
 
 ## Vault OIDC Auth using Keycloak
 
