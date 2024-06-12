@@ -5,6 +5,14 @@
     2020 Ondrej Sika <ondrej@ondrejsika.com>
     https://github.com/ondrejsika/vault-training
 
+## Live Chat
+
+For sharing links & "secrets".
+
+- Campfire - https://sika.link/join-campfire
+- Slack - https://sikapublic.slack.com/
+- Microsoft Teams
+- https://sika.link/chat (tlk.io)
 
 ## Run Vault Dev Server
 
