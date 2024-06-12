@@ -310,35 +310,35 @@ make prod-server
 Init
 
 ```
-kubectl exec -ti vault-0 -- vault operator init
+kubectl exec -ti -n vault vault-0 -- vault operator init
 ```
 
 Unseal
 
 ```
-kubectl exec -ti vault-0 -- vault operator unseal
+kubectl exec -ti -n vault vault-0 -- vault operator unseal
 ```
 
 Add nodes to cluster
 
 ```
-kubectl exec -ti vault-1 -- vault operator raft join http://vault-0.vault-internal:8200
+kubectl exec -ti -n vault vault-1 -- vault operator raft join http://vault-0.vault-internal:8200
 ```
 
 and unseal
 
 ```
-kubectl exec -ti vault-1 -- vault operator unseal
+kubectl exec -ti -n vault vault-1 -- vault operator unseal
 ```
 
 Do it for the 3rd node:
 
 ```
-kubectl exec -ti vault-2 -- vault operator raft join http://vault-0.vault-internal:8200
+kubectl exec -ti -n vault vault-2 -- vault operator raft join http://vault-0.vault-internal:8200
 ```
 
 ```
-kubectl exec -ti vault-2 -- vault operator unseal
+kubectl exec -ti -n vault vault-2 -- vault operator unseal
 ```
 
 Done.
