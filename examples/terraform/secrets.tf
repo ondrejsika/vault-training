@@ -12,11 +12,11 @@ resource "vault_generic_secret" "foo_bar" {
 
   data_json = sensitive(jsonencode(
     {
-      "ACCESS_KEY"  = "CHANGE_ME"
-      "SECRET_KEY"  = "CHANGE_ME"
-      "REGION"      = "CHANGE_ME"
-      "ENDPOINT"    = "CHANGE_ME"
-      "BUCKET_NAME" = "CHANGE_ME"
+      "ACCESS_KEY"  = "__CHANGE_ME__"
+      "SECRET_KEY"  = "__CHANGE_ME__"
+      "REGION"      = "__CHANGE_ME__"
+      "ENDPOINT"    = "__CHANGE_ME__"
+      "BUCKET_NAME" = "__CHANGE_ME__"
     }
   ))
 }
