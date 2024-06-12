@@ -515,16 +515,16 @@ Configure the Keycloak provider by specifying the issuer URL, client ID, client 
 
 ```
 vault write auth/oidc/config \
-  oidc_discovery_url="https://sso.sikademo.com/realms/example" \
-  oidc_client_id="example" \
-  oidc_client_secret="example" \
+  oidc_discovery_url="https://sso.sikalabs.com/realms/sikademo" \
+  oidc_client_id="default" \
+  oidc_client_secret="default" \
   oidc_scope="openid profile email roles" \
   default_role="default"
 ```
 
 ```
 vault write auth/oidc/role/default \
-  bound_audiences="example" \
+  bound_audiences="default" \
   allowed_redirect_uris="http://localhost:8200/ui/vault/auth/oidc/oidc/callback" \
   allowed_redirect_uris="http://localhost:8250/oidc/callback" \
   user_claim="sub" \
