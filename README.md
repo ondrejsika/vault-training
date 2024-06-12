@@ -523,6 +523,17 @@ vault write auth/oidc/config \
 ```
 
 ```
+vault write auth/oidc/role/manager \
+  bound_audiences="default" \
+  allowed_redirect_uris="http://localhost:8200/ui/vault/auth/oidc/oidc/callback" \
+  allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+  user_claim="email" \
+  token_policies="manager" \
+  groups_claim="groups" \
+  allowed_groups="vault-manager"
+```
+
+```
 vault write auth/oidc/role/default \
   bound_audiences="default" \
   allowed_redirect_uris="http://localhost:8200/ui/vault/auth/oidc/oidc/callback" \
