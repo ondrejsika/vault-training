@@ -198,6 +198,32 @@ vault delete secret/metadata/first
 vault kv list secret/
 ```
 
+## Create .env File From Vault Secret
+
+Create test secret
+
+```
+vault kv put secret/example/prod/env MY_HELLO=world MY_FOO=bar
+```
+
+Create `.env`
+
+```
+slu vault create-env-file -a http://127.0.0.1:8200 -t root -p example/prod/env
+```
+
+Test `.env`
+
+```
+cat .env
+```
+
+Cleanup
+
+```
+vault delete secret/metadata/example/prod/env
+```
+
 ## Dynamic Secrets
 
 ## Database (Postgres)
