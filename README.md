@@ -344,10 +344,18 @@ make prod-server
 Init
 
 ```
+vault operator init
+```
+
+```
 kubectl exec -ti -n vault vault-0 -- vault operator init
 ```
 
 Unseal
+
+```
+vault operator unseal
+```
 
 ```
 kubectl exec -ti -n vault vault-0 -- vault operator unseal
@@ -356,10 +364,18 @@ kubectl exec -ti -n vault vault-0 -- vault operator unseal
 Add nodes to cluster
 
 ```
+vault operator raft join http://vault-0.vault-internal:8200
+```
+
+```
 kubectl exec -ti -n vault vault-1 -- vault operator raft join http://vault-0.vault-internal:8200
 ```
 
 and unseal
+
+```
+vault operator unseal
+```
 
 ```
 kubectl exec -ti -n vault vault-1 -- vault operator unseal
