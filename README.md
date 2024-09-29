@@ -34,6 +34,22 @@ Test it
 VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault status
 ```
 
+### From Docker Compose
+
+Example is [examples/vault_in_docker](./examples/vault_in_docker)
+
+Run
+
+```
+make -C ./examples/vault_in_docker up
+```
+
+Stop
+
+```
+make -C ./examples/vault_in_docker down
+```
+
 ### From Docker
 
 Run
