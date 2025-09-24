@@ -376,11 +376,11 @@ kubectl exec -ti -n vault vault-0 -- vault operator init
 Or init and save info into `json`
 
 ```
-vault operator init -format=json > vault_init.json
+vault operator init -format=json > vault_init.local.json
 ```
 
 ```
-kubectl exec -ti -n vault vault-0 -- vault operator init -format=json > vault_init.json
+kubectl exec -ti -n vault vault-0 -- vault operator init -format=json > vault_init.local.json
 ```
 
 Unseal
