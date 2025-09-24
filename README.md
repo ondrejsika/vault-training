@@ -444,6 +444,22 @@ List raft peers:
 vault operator raft list-peers
 ```
 
+## Unseal All Vault Pods from JSON
+
+```
+kubectl exec -ti -n vault vault-0 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[0]')
+kubectl exec -ti -n vault vault-0 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[1]')
+kubectl exec -ti -n vault vault-0 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[2]')
+
+kubectl exec -ti -n vault vault-1 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[0]')
+kubectl exec -ti -n vault vault-1 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[1]')
+kubectl exec -ti -n vault vault-1 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[2]')
+
+kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[0]')
+kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[1]')
+kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[2]')
+```
+
 ## Backup & Restore
 
 ## Backup
