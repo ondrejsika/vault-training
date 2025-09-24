@@ -2,6 +2,7 @@
 
 local.txt
 *.local.txt
+*.local.json
 
 /tmp
 *.snap
