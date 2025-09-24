@@ -14,6 +14,12 @@ For sharing links & "secrets".
 - Microsoft Teams
 - https://sika.link/chat (tlk.io)
 
+## Vault Community vs Enterprise
+
+https://developer.hashicorp.com/vault/tutorials/get-started/available-editions
+
+We will use **Vault Community** (open source).
+
 ## Run Vault Dev Server
 
 ### Local Binary
