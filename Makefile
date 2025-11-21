@@ -29,10 +29,10 @@ k8s-prod-server:
 		-f examples/k8s/sikademo.values.yml
 
 tergum-copy-config:
-	cp tergum.example.yml tergum.yml
+	cp examples/tergum/tergum.example.yml examples/tergum/tergum.yml
 
 tergum-backup:
-	tergum backup -c tergum.yml
+	tergum backup -c examples/tergum/tergum.yml
 
 fmt:
 	terraform fmt -recursive

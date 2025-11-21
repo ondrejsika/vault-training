@@ -485,13 +485,13 @@ Copy example config & edit token
 
 ```
 make tergum-copy-config
-vim tergum.yml
+vim examples/tergum/tergum.yml
 ```
 
 Run backup
 
 ```
-tergum backup --config tergum.yml
+tergum backup --config examples/tergum/tergum.yml
 ```
 
 ## Vault Secrets Operator
