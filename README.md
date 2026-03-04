@@ -220,6 +220,11 @@ vault delete secret/metadata/first
 vault kv list secret/
 ```
 
+## Terminal UI for Vault
+
+- vaul7y - https://github.com/dkyanakiev/vaul7y
+- v7y (SikaLabs fork of vaul7y) - https://github.com/sikalabsx/v7y
+
 ## Create .env File From Vault Secret
 
 Create test secret
