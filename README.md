@@ -2,9 +2,6 @@
 
 # Vault Training
 
-    2020 Ondrej Sika <ondrej@ondrejsika.com>
-    https://github.com/ondrejsika/vault-training
-
 ## Live Chat
 
 For sharing links & "secrets".
