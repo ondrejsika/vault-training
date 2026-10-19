@@ -28,6 +28,13 @@ k8s-prod-server:
 		-f examples/k8s/general.values.yml \
 		-f examples/k8s/sikademo.values.yml
 
+auto-unseal-server:
+	mkdir -p tmp/vault-auto-unseal
+	VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$$(cat auto_unseal_token.local.txt) vault server -config examples/auto_unseal/vault.hcl
+
+auto-unseal-server-cleanup:
+	rm -rf tmp/vault-auto-unseal auto_unseal_token.local.txt vault_auto_unseal_init.local.json
+
 tergum-copy-config:
 	cp examples/tergum/tergum.example.yml examples/tergum/tergum.yml
 
