@@ -3,6 +3,8 @@
 local.txt
 *.local.txt
 *.local.json
+*.local.crt
+*.local.csr
 
 /tmp
 *.snap
