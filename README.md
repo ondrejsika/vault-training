@@ -360,7 +360,7 @@ vault read aws/creds/s3
 
 Docs:
 
-- [Highly Available Vault Cluster with Integrated Storage (Raft)](https://www.vaultproject.io/docs/platform/k8s/helm/examples/ha-with-raft)
+- [Highly Available Vault Cluster with Integrated Storage (Raft)](https://developer.hashicorp.com/vault/docs/platform/k8s/helm/examples/ha-with-raft)
 
 Install production Vault
 
