@@ -1285,6 +1285,104 @@ kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.loca
 kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[2]')
 ```
 
+You have to do this after every pod restart. That's painful. See [Auto-Unseal](#auto-unseal).
+
+### Auto-Unseal
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/seal#auto-unseal
+
+Unsealing 3 pods with 3 keys by hand after every restart is painful. Auto-unseal is the production answer.
+
+With auto-unseal, the root key is encrypted by an **external key** (cloud KMS, HSM, or the transit secrets engine of another Vault). When Vault starts, it asks the external service to decrypt the root key and unseals itself.
+
+`vault operator init` then creates **recovery keys** instead of unseal keys. You can't unseal Vault with them, but you need them for some operations (for example, to create a new root token with `vault operator generate-root`). Keep them safe.
+
+Supported seals: `awskms`, `azurekeyvault`, `gcpckms`, `ocikms`, `alicloudkms`, `transit`, `pkcs11` (HSM, Enterprise only).
+
+#### Transit Auto-Unseal (Local Demo)
+
+We will use the dev server (on `127.0.0.1:8200`) as the "unsealer" Vault. A second Vault (on `127.0.0.1:8300`) is unsealed using a transit key in the dev server. The config is in [examples/auto_unseal/vault.hcl](./examples/auto_unseal/vault.hcl).
+
+Run the dev server first (`make local-dev-server`).
+
+```
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=root
+```
+
+Create a transit key in the dev server
+
+```
+vault secrets enable transit
+```
+
+```
+vault write -f transit/keys/autounseal
+```
+
+Create a policy and a token for the second Vault, see [examples/auto_unseal/policies/autounseal.hcl](./examples/auto_unseal/policies/autounseal.hcl)
+
+```
+vault policy write autounseal examples/auto_unseal/policies/autounseal.hcl
+```
+
+```
+vault token create -orphan -policy=autounseal -period=24h -field=token > auto_unseal_token.local.txt
+```
+
+Run the second Vault (in a new terminal)
+
+```
+make auto-unseal-server
+```
+
+The transit seal takes its token from the `VAULT_TOKEN` environment variable. If `VAULT_ADDR` is set, the seal uses it instead of `address` from the config. That's why the make target sets both:
+
+```
+VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$(cat auto_unseal_token.local.txt) vault server -config examples/auto_unseal/vault.hcl
+```
+
+Connect to the second Vault
+
+```
+export VAULT_ADDR=http://127.0.0.1:8300
+unset VAULT_TOKEN
+```
+
+```
+vault status
+```
+
+Note `Seal Type: transit`. Initialize it
+
+```
+vault operator init -recovery-shares=1 -recovery-threshold=1 -format=json > vault_auto_unseal_init.local.json
+```
+
+```
+vault status
+```
+
+It is unsealed. No `vault operator unseal` needed.
+
+Stop the second Vault (Ctrl+C) and start it again
+
+```
+make auto-unseal-server
+```
+
+```
+vault status
+```
+
+It is unsealed again, automatically.
+
+Cleanup
+
+```
+make auto-unseal-server-clean
+```
+
 ## Backup & Restore
 
 ### Backup
