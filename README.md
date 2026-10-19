@@ -320,6 +320,137 @@ vault delete secret/metadata/first
 vault kv list secret/
 ```
 
+## Policies
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/policies
+
+Policies say **what a token can do on which path**. Vault denies everything by default. A token can do only what its policies allow.
+
+Capabilities:
+
+- `create` - create new data (`POST`/`PUT` to a path that doesn't exist)
+- `read` - read data (`GET`)
+- `update` - change existing data (`POST`/`PUT`)
+- `patch` - patch data (`PATCH`)
+- `delete` - delete data (`DELETE`)
+- `list` - list keys (`LIST`)
+- `sudo` - access root-protected paths
+- `deny` - deny access, always wins
+
+Built-in policies:
+
+- `root` - can do everything
+- `default` - attached to every token, lets the token look up and renew itself
+
+```
+vault policy list
+```
+
+```
+vault policy read default
+```
+
+### KV v2 Paths in Policies
+
+This confuses a lot of people. **For KV v2, the path in the CLI is not the path in the API.**
+
+When you run `vault kv get secret/myapp/config`, the CLI calls `secret/data/myapp/config`. You can see it in the output (`Secret Path: secret/data/myapp/config`).
+
+| CLI command | Path in policy | Capability |
+| --- | --- | --- |
+| `vault kv get secret/myapp/config` | `secret/data/myapp/config` | `read` |
+| `vault kv put secret/myapp/config ...` | `secret/data/myapp/config` | `create`, `update` |
+| `vault kv patch secret/myapp/config ...` | `secret/data/myapp/config` | `patch` |
+| `vault kv list secret/myapp` | `secret/metadata/myapp` | `list` |
+| `vault kv metadata get secret/myapp/config` | `secret/metadata/myapp/config` | `read` |
+| `vault kv delete secret/myapp/config` | `secret/data/myapp/config` | `delete` |
+| `vault kv undelete -versions=1 secret/myapp/config` | `secret/undelete/myapp/config` | `update` |
+| `vault kv destroy -versions=1 secret/myapp/config` | `secret/destroy/myapp/config` | `update` |
+| `vault kv metadata delete secret/myapp/config` | `secret/metadata/myapp/config` | `delete` |
+
+So a policy with `path "secret/myapp/*"` **matches nothing** in KV v2. You have to use `secret/data/myapp/*` and `secret/metadata/myapp/*`.
+
+A policy with `path "secret/*"` matches all of them (`secret/data/...`, `secret/metadata/...`, ...). That's why it works, but it gives access to the whole mount.
+
+### Write Policy
+
+Create a test secret
+
+```
+vault kv put secret/myapp/config db_password=s3cret
+```
+
+Write a **wrong** policy (it uses a KV v1 style path)
+
+```
+vault policy write wrong - <<EOF
+path "secret/myapp/*" {
+  capabilities = ["read"]
+}
+EOF
+```
+
+Create a token with this policy and try to read the secret
+
+```
+WRONG_TOKEN=$(vault token create -policy=wrong -field=token)
+```
+
+```
+VAULT_TOKEN=$WRONG_TOKEN vault kv get secret/myapp/config
+```
+
+Permission denied.
+
+Now write the correct policy, see [examples/policies/myapp_read.hcl](./examples/policies/myapp_read.hcl)
+
+```
+vault policy write myapp-read examples/policies/myapp_read.hcl
+```
+
+```
+vault policy read myapp-read
+```
+
+```
+MYAPP_TOKEN=$(vault token create -policy=myapp-read -field=token)
+```
+
+```
+VAULT_TOKEN=$MYAPP_TOKEN vault kv get secret/myapp/config
+```
+
+```
+VAULT_TOKEN=$MYAPP_TOKEN vault kv list secret/myapp
+```
+
+Try to write (it is a read-only policy)
+
+```
+VAULT_TOKEN=$MYAPP_TOKEN vault kv put secret/myapp/config db_password=hacked
+```
+
+Permission denied.
+
+Check the token's capabilities on a path
+
+```
+vault token capabilities $MYAPP_TOKEN secret/data/myapp/config
+vault token capabilities $MYAPP_TOKEN secret/data/other/config
+```
+
+A policy for full management of `secret/myapp/*` is in [examples/policies/myapp_write.hcl](./examples/policies/myapp_write.hcl).
+
+```
+vault policy write myapp-write examples/policies/myapp_write.hcl
+```
+
+Cleanup
+
+```
+vault policy delete wrong
+```
+
 ## Terminal UI for Vault
 
 - vaul7y - https://github.com/dkyanakiev/vaul7y
