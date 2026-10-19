@@ -994,6 +994,126 @@ path "transit/decrypt/myapp" {
 EOF
 ```
 
+## PKI Secrets Engine
+
+Docs:
+
+- https://developer.hashicorp.com/vault/docs/secrets/pki
+- https://developer.hashicorp.com/vault/tutorials/pki/pki-engine
+
+Vault works as a **certificate authority**. It issues short-lived TLS certificates on demand, so you don't have to rotate certificates by hand. Use it for internal services, mTLS, service mesh, and so on.
+
+We will create a **root CA** and an **intermediate CA** signed by the root CA. The intermediate CA issues the certificates.
+
+### Root CA
+
+```
+vault secrets enable pki
+```
+
+```
+vault secrets tune -max-lease-ttl=87600h pki
+```
+
+```
+vault write -field=certificate pki/root/generate/internal \
+  common_name="Example Root CA" \
+  ttl=87600h > root_ca.local.crt
+```
+
+```
+vault write pki/config/urls \
+  issuing_certificates="$VAULT_ADDR/v1/pki/ca" \
+  crl_distribution_points="$VAULT_ADDR/v1/pki/crl"
+```
+
+### Intermediate CA
+
+```
+vault secrets enable -path=pki_int pki
+```
+
+```
+vault secrets tune -max-lease-ttl=43800h pki_int
+```
+
+Generate a CSR for the intermediate CA
+
+```
+vault write -field=csr pki_int/intermediate/generate/internal \
+  common_name="Example Intermediate CA" > pki_int.local.csr
+```
+
+Sign it with the root CA
+
+```
+vault write -field=certificate pki/root/sign-intermediate \
+  csr=@pki_int.local.csr \
+  format=pem_bundle \
+  ttl=43800h > pki_int.local.crt
+```
+
+Import the signed certificate
+
+```
+vault write pki_int/intermediate/set-signed certificate=@pki_int.local.crt
+```
+
+```
+vault write pki_int/config/urls \
+  issuing_certificates="$VAULT_ADDR/v1/pki_int/ca" \
+  crl_distribution_points="$VAULT_ADDR/v1/pki_int/crl"
+```
+
+### Role
+
+The role says what certificates can be issued.
+
+```
+vault write pki_int/roles/example-com \
+  allowed_domains=example.com \
+  allow_subdomains=true \
+  max_ttl=72h
+```
+
+### Issue Certificate
+
+```
+vault write pki_int/issue/example-com common_name=www.example.com ttl=24h
+```
+
+Save it to JSON and inspect the certificate
+
+```
+vault write -format=json pki_int/issue/example-com common_name=www.example.com ttl=24h > cert.local.json
+```
+
+```
+jq -r .data.certificate cert.local.json | openssl x509 -noout -subject -issuer -enddate
+```
+
+Try a domain that is not allowed
+
+```
+vault write pki_int/issue/example-com common_name=www.google.com
+```
+
+### Revoke Certificate
+
+```
+vault write pki_int/revoke serial_number=$(jq -r .data.serial_number cert.local.json)
+```
+
+```
+vault list pki_int/certs/revoked
+```
+
+Cleanup
+
+```
+rm root_ca.local.crt pki_int.local.csr pki_int.local.crt cert.local.json
+```
+
 ## Production Vault on Kubernetes
 
 Docs:
