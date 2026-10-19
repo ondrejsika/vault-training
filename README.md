@@ -714,6 +714,190 @@ Get credentials
 vault read aws/creds/s3
 ```
 
+## Tokens & Leases
+
+### Tokens
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/tokens
+
+Look up your current token
+
+```
+vault token lookup
+```
+
+Create a token with a policy and a TTL
+
+```
+vault token create -policy=myapp-read -ttl=10m -explicit-max-ttl=1h
+```
+
+```
+TOKEN=$(vault token create -policy=myapp-read -ttl=10m -explicit-max-ttl=1h -field=token)
+```
+
+Look up the token
+
+```
+vault token lookup $TOKEN
+```
+
+Renew the token (the TTL can't go over `explicit_max_ttl`)
+
+```
+vault token renew -increment=30m $TOKEN
+```
+
+Revoke the token
+
+```
+vault token revoke $TOKEN
+```
+
+```
+vault token lookup $TOKEN
+```
+
+#### Token Accessors
+
+Every token has an **accessor**. You can use it to look up and revoke the token, but not to use the token. It is safe to log and store accessors.
+
+```
+ACCESSOR=$(vault token create -policy=myapp-read -field=token_accessor)
+```
+
+```
+vault token lookup -accessor $ACCESSOR
+```
+
+```
+vault token revoke -accessor $ACCESSOR
+```
+
+List all token accessors
+
+```
+vault list auth/token/accessors
+```
+
+#### Token Hierarchy
+
+A token is a **child** of the token that created it. When you revoke the parent, all its children are revoked too.
+
+Create a parent token that can create tokens
+
+```
+vault policy write token-create - <<EOF
+path "auth/token/create" {
+  capabilities = ["create", "update"]
+}
+EOF
+```
+
+```
+PARENT=$(vault token create -policy=token-create -policy=myapp-read -field=token)
+```
+
+Create a child token using the parent token (a child can have only a subset of the parent's policies)
+
+```
+CHILD=$(VAULT_TOKEN=$PARENT vault token create -policy=myapp-read -field=token)
+```
+
+Revoke the parent
+
+```
+vault token revoke $PARENT
+```
+
+The child is revoked too
+
+```
+vault token lookup $CHILD
+```
+
+The `-orphan` flag creates a token without a parent, so it is not revoked with the parent.
+
+```
+vault token create -orphan -policy=myapp-read
+```
+
+#### Periodic Tokens
+
+A periodic token has no max TTL. It lives as long as it is renewed within the period. It is good for long-running services.
+
+```
+vault token create -policy=myapp-read -period=24h
+```
+
+### Leases
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/lease
+
+Every dynamic secret (Postgres credentials, AWS keys, ...) has a **lease**. Read some credentials (from the [Database (Postgres)](#database-postgres) and [AWS](#aws) examples)
+
+```
+vault read database/creds/readonly
+vault read database/creds/readonly
+vault read aws/creds/s3
+```
+
+See the `lease_id`, `lease_duration` and `lease_renewable` fields.
+
+List leases
+
+```
+vault list sys/leases/lookup/database/creds/readonly
+```
+
+```
+vault list sys/leases/lookup/aws/creds/s3
+```
+
+Look up a lease
+
+```
+vault lease lookup database/creds/readonly/<lease_id>
+```
+
+Renew a lease (up to the role's `max_ttl`)
+
+```
+vault lease renew -increment=1h database/creds/readonly/<lease_id>
+```
+
+Revoke a lease. Vault drops the Postgres user immediately.
+
+```
+vault lease revoke database/creds/readonly/<lease_id>
+```
+
+#### Revoke All Leases with Prefix
+
+This is your **break glass** button. For example, if AWS keys leak, you can revoke all keys created by the `s3` role at once. Vault deletes all those IAM users in AWS.
+
+```
+vault lease revoke -prefix aws/creds/s3
+```
+
+Revoke all Postgres credentials
+
+```
+vault lease revoke -prefix database/creds/readonly
+```
+
+Revoke everything from the AWS secrets engine
+
+```
+vault lease revoke -prefix aws/
+```
+
+Check it
+
+```
+vault list sys/leases/lookup/aws/creds/s3
+```
+
 ## Production Vault on Kubernetes
 
 Docs:
