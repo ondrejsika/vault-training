@@ -1,0 +1,53 @@
+# Auto-unseal using AWS KMS
+#
+# Use together with general.values.yml:
+#
+#   helm upgrade --install vault --repo https://helm.releases.hashicorp.com vault \
+#     --namespace vault --create-namespace \
+#     -f examples/k8s/general.values.yml \
+#     -f examples/k8s/awskms_auto_unseal.values.yml
+#
+# AWS credentials are read from the Kubernetes secret vault-awskms
+#
+#   kubectl create secret generic vault-awskms -n vault \
+#     --from-literal=AWS_ACCESS_KEY_ID=... \
+#     --from-literal=AWS_SECRET_ACCESS_KEY=...
+server:
+  extraSecretEnvironmentVars:
+    - envName: AWS_ACCESS_KEY_ID
+      secretName: vault-awskms
+      secretKey: AWS_ACCESS_KEY_ID
+    - envName: AWS_SECRET_ACCESS_KEY
+      secretName: vault-awskms
+      secretKey: AWS_SECRET_ACCESS_KEY
+  ha:
+    raft:
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+
+          retry_join {
+            leader_api_addr = "http://vault-0.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://vault-1.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://vault-2.vault-internal:8200"
+          }
+        }
+
+        seal "awskms" {
+          region     = "eu-central-1"
+          kms_key_id = "alias/vault-unseal"
+        }
+
+        service_registration "kubernetes" {}

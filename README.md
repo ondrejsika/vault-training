@@ -107,6 +107,109 @@ make docker-dev-server-shell
 
 And just run `vault status`. Everything is configured.
 
+## How Vault Works
+
+Before we store any secret, let's look at the main parts of Vault. You can see most of them in the `vault status` output above.
+
+### Storage Backend
+
+Vault does not store data itself; it uses a **storage backend**. Everything Vault writes to the storage is **encrypted**, so the storage never sees any secret in plain text.
+
+- `inmem` - in memory, used by the dev server (`Storage Type: inmem`), everything is lost on restart
+- `raft` - Integrated Storage, built into Vault, replicated between Vault nodes, recommended for production (we will use it on Kubernetes)
+- `file`, `consul`, `postgresql`, ...
+
+Docs: https://developer.hashicorp.com/vault/docs/configuration/storage
+
+### Seal / Unseal
+
+The data in the storage is encrypted by the **encryption key**. The encryption key is encrypted by the **root key** (also called the master key). Vault keeps the root key only in memory.
+
+When Vault starts, it is **sealed**. It knows where the data is, but it can't decrypt it. It can't do anything except unseal.
+
+**Unsealing** means rebuilding the root key in memory. By default (`Seal Type: shamir`), the root key is split into **key shares** using [Shamir's Secret Sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing). `vault operator init` creates 5 shares, and any 3 of them (the threshold) can rebuild the root key. You can give the shares to different people, so no one can unseal Vault alone.
+
+After a restart (or a crash, or a new pod), Vault is sealed again and **somebody has to unseal it**. That's why production setups use [auto-unseal](#auto-unseal).
+
+The dev server is initialized and unsealed automatically with only 1 key share. You can find the unseal key in the server output (`Unseal Key: ...`). If you run Vault in Docker:
+
+```
+docker logs vault-dev 2>&1 | grep 'Unseal Key'
+```
+
+Seal Vault (for example, in an emergency)
+
+```
+vault operator seal
+```
+
+```
+vault status
+```
+
+Try to do something
+
+```
+vault secrets list
+```
+
+Unseal Vault using the unseal key
+
+```
+vault operator unseal
+```
+
+```
+vault status
+```
+
+### Secrets Engines
+
+Secrets engines store, generate, or encrypt data. Each one is mounted at a path; for example, the dev server has KV v2 at `secret/`.
+
+```
+vault secrets list
+```
+
+### Auth Methods
+
+Auth methods check who you are (a username and password, an OIDC login, a Kubernetes service account, ...). If the login succeeds, they give you a **token**.
+
+```
+vault auth list
+```
+
+### Tokens
+
+**Everything in Vault is done with a token.** Every auth method just turns your identity into a token. The token has **policies** attached, which say what the token can do.
+
+The `root` token can do everything. Use it only for the initial setup.
+
+```
+vault token lookup
+```
+
+### Leases & TTLs
+
+Tokens and dynamic secrets have a **lease** with a **TTL** (time to live). When the TTL expires, Vault revokes them: it deletes the token or, for example, drops the database user. You can **renew** a lease (up to `max_ttl`) or **revoke** it early.
+
+Static KV secrets don't have leases.
+
+### Paths
+
+Everything in Vault is a path; the CLI just calls the HTTP API.
+
+- `secret/...` - KV secrets engine
+- `database/...` - Database secrets engine
+- `auth/userpass/...` - userpass auth method
+- `sys/...` - system backend (configuration of Vault itself)
+
+See the API call behind any CLI command:
+
+```
+vault secrets list -output-curl-string
+```
+
 ## Static Secrets
 
 Available commands for `vault kv <command> ...`
@@ -215,6 +318,264 @@ vault delete secret/metadata/first
 
 ```
 vault kv list secret/
+```
+
+## Policies
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/policies
+
+Policies say **what a token can do on which path**. Vault denies everything by default. A token can do only what its policies allow.
+
+Capabilities:
+
+- `create` - create new data (`POST`/`PUT` to a path that doesn't exist)
+- `read` - read data (`GET`)
+- `update` - change existing data (`POST`/`PUT`)
+- `patch` - patch data (`PATCH`)
+- `delete` - delete data (`DELETE`)
+- `list` - list keys (`LIST`)
+- `sudo` - access root-protected paths
+- `deny` - deny access, always wins
+
+Built-in policies:
+
+- `root` - can do everything
+- `default` - attached to every token, lets the token look up and renew itself
+
+```
+vault policy list
+```
+
+```
+vault policy read default
+```
+
+### KV v2 Paths in Policies
+
+This confuses a lot of people. **For KV v2, the path in the CLI is not the path in the API.**
+
+When you run `vault kv get secret/myapp/config`, the CLI calls `secret/data/myapp/config`. You can see it in the output (`Secret Path: secret/data/myapp/config`).
+
+| CLI command | Path in policy | Capability |
+| --- | --- | --- |
+| `vault kv get secret/myapp/config` | `secret/data/myapp/config` | `read` |
+| `vault kv put secret/myapp/config ...` | `secret/data/myapp/config` | `create`, `update` |
+| `vault kv patch secret/myapp/config ...` | `secret/data/myapp/config` | `patch` |
+| `vault kv list secret/myapp` | `secret/metadata/myapp` | `list` |
+| `vault kv metadata get secret/myapp/config` | `secret/metadata/myapp/config` | `read` |
+| `vault kv delete secret/myapp/config` | `secret/data/myapp/config` | `delete` |
+| `vault kv undelete -versions=1 secret/myapp/config` | `secret/undelete/myapp/config` | `update` |
+| `vault kv destroy -versions=1 secret/myapp/config` | `secret/destroy/myapp/config` | `update` |
+| `vault kv metadata delete secret/myapp/config` | `secret/metadata/myapp/config` | `delete` |
+
+So a policy with `path "secret/myapp/*"` **matches nothing** in KV v2. You have to use `secret/data/myapp/*` and `secret/metadata/myapp/*`.
+
+A policy with `path "secret/*"` matches all of them (`secret/data/...`, `secret/metadata/...`, ...). That's why it works, but it gives access to the whole mount.
+
+### Write Policy
+
+Create a test secret
+
+```
+vault kv put secret/myapp/config db_password=s3cret
+```
+
+Write a **wrong** policy (it uses a KV v1 style path)
+
+```
+vault policy write wrong - <<EOF
+path "secret/myapp/*" {
+  capabilities = ["read"]
+}
+EOF
+```
+
+Create a token with this policy and try to read the secret
+
+```
+WRONG_TOKEN=$(vault token create -policy=wrong -field=token)
+```
+
+```
+VAULT_TOKEN=$WRONG_TOKEN vault kv get secret/myapp/config
+```
+
+Permission denied.
+
+Now write the correct policy, see [examples/policies/myapp-read.hcl](./examples/policies/myapp-read.hcl)
+
+```
+vault policy write myapp-read examples/policies/myapp-read.hcl
+```
+
+```
+vault policy read myapp-read
+```
+
+```
+MYAPP_TOKEN=$(vault token create -policy=myapp-read -field=token)
+```
+
+```
+VAULT_TOKEN=$MYAPP_TOKEN vault kv get secret/myapp/config
+```
+
+```
+VAULT_TOKEN=$MYAPP_TOKEN vault kv list secret/myapp
+```
+
+Try to write (it is a read-only policy)
+
+```
+VAULT_TOKEN=$MYAPP_TOKEN vault kv put secret/myapp/config db_password=hacked
+```
+
+Permission denied.
+
+Check the token's capabilities on a path
+
+```
+vault token capabilities $MYAPP_TOKEN secret/data/myapp/config
+vault token capabilities $MYAPP_TOKEN secret/data/other/config
+```
+
+A policy for full management of `secret/myapp/*` is in [examples/policies/myapp-write.hcl](./examples/policies/myapp-write.hcl).
+
+```
+vault policy write myapp-write examples/policies/myapp-write.hcl
+```
+
+Cleanup
+
+```
+vault policy delete wrong
+```
+
+## Auth Methods
+
+Docs: https://developer.hashicorp.com/vault/docs/auth
+
+There are auth methods for **humans** (userpass, OIDC, LDAP, GitHub, ...) and for **machines** (AppRole, Kubernetes, AWS, JWT, TLS certificates, ...).
+
+```
+vault auth list
+```
+
+### Userpass
+
+The simplest auth method for humans: a username and a password stored in Vault. It is good for demos and small setups. In a company, use OIDC (see [Vault OIDC Auth using Keycloak](#vault-oidc-auth-using-keycloak)) or LDAP instead.
+
+Enable userpass
+
+```
+vault auth enable userpass
+```
+
+Create a user
+
+```
+vault write auth/userpass/users/alice \
+  password=alice \
+  token_policies=myapp-read \
+  token_ttl=1h \
+  token_max_ttl=8h
+```
+
+```
+vault list auth/userpass/users
+```
+
+Log in as alice. The `-no-store` flag keeps your root token in `~/.vault-token`.
+
+```
+vault login -method=userpass -no-store username=alice
+```
+
+Use the token from the output
+
+```
+VAULT_TOKEN=... vault kv get secret/myapp/config
+```
+
+```
+VAULT_TOKEN=... vault token lookup
+```
+
+### AppRole
+
+Docs: https://developer.hashicorp.com/vault/docs/auth/approle
+
+AppRole is the main way **applications** (CI jobs, servers, scripts) log in to Vault when they don't run on a platform with its own auth method (like Kubernetes or AWS).
+
+The application needs two values:
+
+- **Role ID** - like a username, not secret, you can put it in the application config
+- **Secret ID** - like a password, secret, short-lived, delivered to the application separately (for example by CI or by a deployment tool)
+
+Enable AppRole
+
+```
+vault auth enable approle
+```
+
+Create a role
+
+```
+vault write auth/approle/role/myapp \
+  token_policies=myapp-read \
+  token_ttl=1h \
+  token_max_ttl=4h \
+  secret_id_ttl=24h \
+  secret_id_num_uses=10
+```
+
+Get the Role ID
+
+```
+vault read auth/approle/role/myapp/role-id
+```
+
+```
+ROLE_ID=$(vault read -field=role_id auth/approle/role/myapp/role-id)
+```
+
+Generate a Secret ID
+
+```
+vault write -f auth/approle/role/myapp/secret-id
+```
+
+```
+SECRET_ID=$(vault write -f -field=secret_id auth/approle/role/myapp/secret-id)
+```
+
+Log in as the application
+
+```
+vault write auth/approle/login role_id=$ROLE_ID secret_id=$SECRET_ID
+```
+
+```
+APP_TOKEN=$(vault write -field=token auth/approle/login role_id=$ROLE_ID secret_id=$SECRET_ID)
+```
+
+Read the secret as the application
+
+```
+VAULT_TOKEN=$APP_TOKEN vault kv get -field=db_password secret/myapp/config
+```
+
+The same login using the HTTP API (what your application does)
+
+```
+curl -s -X POST $VAULT_ADDR/v1/auth/approle/login \
+  -d "{\"role_id\":\"$ROLE_ID\",\"secret_id\":\"$SECRET_ID\"}" | jq .auth
+```
+
+List Secret ID accessors
+
+```
+vault list auth/approle/role/myapp/secret-id
 ```
 
 ## Terminal UI for Vault
@@ -353,6 +714,468 @@ Get credentials
 vault read aws/creds/s3
 ```
 
+## Tokens & Leases
+
+### Tokens
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/tokens
+
+Look up your current token
+
+```
+vault token lookup
+```
+
+Create a token with a policy and a TTL
+
+```
+vault token create -policy=myapp-read -ttl=10m -explicit-max-ttl=1h
+```
+
+```
+TOKEN=$(vault token create -policy=myapp-read -ttl=10m -explicit-max-ttl=1h -field=token)
+```
+
+Look up the token
+
+```
+vault token lookup $TOKEN
+```
+
+Renew the token (the TTL can't go over `explicit_max_ttl`)
+
+```
+vault token renew -increment=30m $TOKEN
+```
+
+Revoke the token
+
+```
+vault token revoke $TOKEN
+```
+
+```
+vault token lookup $TOKEN
+```
+
+#### Token Accessors
+
+Every token has an **accessor**. You can use it to look up and revoke the token, but not to use the token. It is safe to log and store accessors.
+
+```
+ACCESSOR=$(vault token create -policy=myapp-read -field=token_accessor)
+```
+
+```
+vault token lookup -accessor $ACCESSOR
+```
+
+```
+vault token revoke -accessor $ACCESSOR
+```
+
+List all token accessors
+
+```
+vault list auth/token/accessors
+```
+
+#### Token Hierarchy
+
+A token is a **child** of the token that created it. When you revoke the parent, all its children are revoked too.
+
+Create a parent token that can create tokens
+
+```
+vault policy write token-create - <<EOF
+path "auth/token/create" {
+  capabilities = ["create", "update"]
+}
+EOF
+```
+
+```
+PARENT=$(vault token create -policy=token-create -policy=myapp-read -field=token)
+```
+
+Create a child token using the parent token (a child can have only a subset of the parent's policies)
+
+```
+CHILD=$(VAULT_TOKEN=$PARENT vault token create -policy=myapp-read -field=token)
+```
+
+Revoke the parent
+
+```
+vault token revoke $PARENT
+```
+
+The child is revoked too
+
+```
+vault token lookup $CHILD
+```
+
+The `-orphan` flag creates a token without a parent, so it is not revoked with the parent.
+
+```
+vault token create -orphan -policy=myapp-read
+```
+
+#### Periodic Tokens
+
+A periodic token has no max TTL. It lives as long as it is renewed within the period. It is good for long-running services.
+
+```
+vault token create -policy=myapp-read -period=24h
+```
+
+### Leases
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/lease
+
+Every dynamic secret (Postgres credentials, AWS keys, ...) has a **lease**. Read some credentials (from the [Database (Postgres)](#database-postgres) and [AWS](#aws) examples)
+
+```
+vault read database/creds/readonly
+vault read database/creds/readonly
+vault read aws/creds/s3
+```
+
+See the `lease_id`, `lease_duration` and `lease_renewable` fields.
+
+List leases
+
+```
+vault list sys/leases/lookup/database/creds/readonly
+```
+
+```
+vault list sys/leases/lookup/aws/creds/s3
+```
+
+Look up a lease
+
+```
+vault lease lookup database/creds/readonly/<lease_id>
+```
+
+Renew a lease (up to the role's `max_ttl`)
+
+```
+vault lease renew -increment=1h database/creds/readonly/<lease_id>
+```
+
+Revoke a lease. Vault drops the Postgres user immediately.
+
+```
+vault lease revoke database/creds/readonly/<lease_id>
+```
+
+#### Revoke All Leases with Prefix
+
+This is your **break glass** button. For example, if AWS keys leak, you can revoke all keys created by the `s3` role at once. Vault deletes all those IAM users in AWS.
+
+```
+vault lease revoke -prefix aws/creds/s3
+```
+
+Revoke all Postgres credentials
+
+```
+vault lease revoke -prefix database/creds/readonly
+```
+
+Revoke everything from the AWS secrets engine
+
+```
+vault lease revoke -prefix aws/
+```
+
+Check it
+
+```
+vault list sys/leases/lookup/aws/creds/s3
+```
+
+## Transit Secrets Engine
+
+Docs: https://developer.hashicorp.com/vault/docs/secrets/transit
+
+**Encryption as a service.** Vault encrypts and decrypts data, but doesn't store it. The application stores the ciphertext in its own database, and the **key never leaves Vault**.
+
+Enable transit
+
+```
+vault secrets enable transit
+```
+
+Create an encryption key
+
+```
+vault write -f transit/keys/myapp
+```
+
+```
+vault read transit/keys/myapp
+```
+
+Encrypt data (the plaintext must be base64 encoded)
+
+```
+vault write transit/encrypt/myapp plaintext=$(echo -n "my secret data" | base64)
+```
+
+```
+CIPHERTEXT=$(vault write -field=ciphertext transit/encrypt/myapp plaintext=$(echo -n "my secret data" | base64))
+echo $CIPHERTEXT
+```
+
+The ciphertext starts with `vault:v1:`, where `v1` is the version of the key.
+
+Decrypt data
+
+```
+vault write -field=plaintext transit/decrypt/myapp ciphertext=$CIPHERTEXT | base64 --decode && echo
+```
+
+### Key Rotation
+
+Rotate the key
+
+```
+vault write -f transit/keys/myapp/rotate
+```
+
+```
+vault read transit/keys/myapp
+```
+
+New data is encrypted with the new version of the key (`vault:v2:...`)
+
+```
+vault write transit/encrypt/myapp plaintext=$(echo -n "my secret data" | base64)
+```
+
+Old data still works
+
+```
+vault write -field=plaintext transit/decrypt/myapp ciphertext=$CIPHERTEXT | base64 --decode && echo
+```
+
+Rewrap old ciphertext with the latest key (Vault doesn't return the plaintext)
+
+```
+vault write transit/rewrap/myapp ciphertext=$CIPHERTEXT
+```
+
+Disable decryption with old versions of the key
+
+```
+vault write transit/keys/myapp/config min_decryption_version=2
+```
+
+```
+vault write transit/decrypt/myapp ciphertext=$CIPHERTEXT
+```
+
+### Policy for Application
+
+The application can encrypt and decrypt, but it can't read, export or rotate the key.
+
+```
+vault policy write myapp-transit - <<EOF
+path "transit/encrypt/myapp" {
+  capabilities = ["update"]
+}
+path "transit/decrypt/myapp" {
+  capabilities = ["update"]
+}
+EOF
+```
+
+## PKI Secrets Engine
+
+Docs:
+
+- https://developer.hashicorp.com/vault/docs/secrets/pki
+- https://developer.hashicorp.com/vault/tutorials/pki/pki-engine
+
+Vault works as a **certificate authority**. It issues short-lived TLS certificates on demand, so you don't have to rotate certificates by hand. Use it for internal services, mTLS, service mesh, and so on.
+
+We will create a **root CA** and an **intermediate CA** signed by the root CA. The intermediate CA issues the certificates.
+
+### Root CA
+
+```
+vault secrets enable pki
+```
+
+```
+vault secrets tune -max-lease-ttl=87600h pki
+```
+
+```
+vault write -field=certificate pki/root/generate/internal \
+  common_name="Example Root CA" \
+  ttl=87600h > root_ca.local.crt
+```
+
+```
+vault write pki/config/urls \
+  issuing_certificates="$VAULT_ADDR/v1/pki/ca" \
+  crl_distribution_points="$VAULT_ADDR/v1/pki/crl"
+```
+
+### Intermediate CA
+
+```
+vault secrets enable -path=pki_int pki
+```
+
+```
+vault secrets tune -max-lease-ttl=43800h pki_int
+```
+
+Generate a CSR for the intermediate CA
+
+```
+vault write -field=csr pki_int/intermediate/generate/internal \
+  common_name="Example Intermediate CA" > pki_int.local.csr
+```
+
+Sign it with the root CA
+
+```
+vault write -field=certificate pki/root/sign-intermediate \
+  csr=@pki_int.local.csr \
+  format=pem_bundle \
+  ttl=43800h > pki_int.local.crt
+```
+
+Import the signed certificate
+
+```
+vault write pki_int/intermediate/set-signed certificate=@pki_int.local.crt
+```
+
+```
+vault write pki_int/config/urls \
+  issuing_certificates="$VAULT_ADDR/v1/pki_int/ca" \
+  crl_distribution_points="$VAULT_ADDR/v1/pki_int/crl"
+```
+
+### Role
+
+The role says what certificates can be issued.
+
+```
+vault write pki_int/roles/example-com \
+  allowed_domains=example.com \
+  allow_subdomains=true \
+  max_ttl=72h
+```
+
+### Issue Certificate
+
+```
+vault write pki_int/issue/example-com common_name=www.example.com ttl=24h
+```
+
+Save it to JSON and inspect the certificate
+
+```
+vault write -format=json pki_int/issue/example-com common_name=www.example.com ttl=24h > cert.local.json
+```
+
+```
+jq -r .data.certificate cert.local.json | openssl x509 -noout -subject -issuer -enddate
+```
+
+Try a domain that is not allowed
+
+```
+vault write pki_int/issue/example-com common_name=www.google.com
+```
+
+### Revoke Certificate
+
+```
+vault write pki_int/revoke serial_number=$(jq -r .data.serial_number cert.local.json)
+```
+
+```
+vault list pki_int/certs/revoked
+```
+
+Cleanup
+
+```
+rm root_ca.local.crt pki_int.local.csr pki_int.local.crt cert.local.json
+```
+
+## Audit Devices
+
+Docs: https://developer.hashicorp.com/vault/docs/audit
+
+An audit device logs **every request and response** to Vault: who did what, on which path, and when. **You can't run Vault in production without it.**
+
+Sensitive values (tokens, secrets) are not logged in plain text. They are hashed with HMAC-SHA256, so you can search for a known value without storing it in the log.
+
+If Vault can't write to **any** enabled audit device, it stops serving requests. That's why production setups use more than one audit device.
+
+Enable the file audit device
+
+```
+vault audit enable file file_path=/tmp/vault_audit.log
+```
+
+If you run Vault in Docker, the file is inside the container, so use `make docker-dev-server-shell`.
+
+```
+vault audit list -detailed
+```
+
+Make a request
+
+```
+vault kv get secret/myapp/config
+```
+
+See the log
+
+```
+tail -n 2 /tmp/vault_audit.log | jq
+```
+
+```
+tail -n 1 /tmp/vault_audit.log | jq '{time, type, path: .request.path, operation: .request.operation, policies: .auth.policies, data: .response.data}'
+```
+
+Get the HMAC of a known value (for example, a token) and search the log for it
+
+```
+vault write sys/audit-hash/file input=root
+```
+
+```
+grep -c $(vault write -field=hash sys/audit-hash/file input=root) /tmp/vault_audit.log
+```
+
+Other audit device types: `syslog`, `socket`.
+
+On Kubernetes, the Helm chart creates a volume for audit logs (`server.auditStorage` in [examples/k8s/general.values.yml](./examples/k8s/general.values.yml)). Enable the audit device with a path on that volume:
+
+```
+vault audit enable file file_path=/vault/audit/vault_audit.log
+```
+
+Disable the audit device
+
+```
+vault audit disable file
+```
+
 ## Production Vault on Kubernetes
 
 Docs:
@@ -461,6 +1284,152 @@ kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.loca
 kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[1]')
 kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[2]')
 ```
+
+You have to do this after every pod restart. That's painful. See [Auto-Unseal](#auto-unseal).
+
+### Auto-Unseal
+
+Docs: https://developer.hashicorp.com/vault/docs/concepts/seal#auto-unseal
+
+Unsealing 3 pods with 3 keys by hand after every restart is painful. Auto-unseal is the production answer.
+
+With auto-unseal, the root key is encrypted by an **external key** (cloud KMS, HSM, or the transit secrets engine of another Vault). When Vault starts, it asks the external service to decrypt the root key and unseals itself.
+
+`vault operator init` then creates **recovery keys** instead of unseal keys. You can't unseal Vault with them, but you need them for some operations (for example, to create a new root token with `vault operator generate-root`). Keep them safe.
+
+Supported seals: `awskms`, `azurekeyvault`, `gcpckms`, `ocikms`, `alicloudkms`, `transit`, `pkcs11` (HSM, Enterprise only).
+
+#### Transit Auto-Unseal (Local Demo)
+
+We will use the dev server (on `127.0.0.1:8200`) as the "unsealer" Vault. A second Vault (on `127.0.0.1:8300`) is unsealed using a transit key in the dev server. The config is in [examples/auto_unseal/vault.hcl](./examples/auto_unseal/vault.hcl).
+
+Run the dev server first (`make local-dev-server`).
+
+```
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=root
+```
+
+Create a transit key in the dev server
+
+```
+vault secrets enable transit
+```
+
+```
+vault write -f transit/keys/autounseal
+```
+
+Create a policy and a token for the second Vault, see [examples/auto_unseal/autounseal.hcl](./examples/auto_unseal/autounseal.hcl)
+
+```
+vault policy write autounseal examples/auto_unseal/autounseal.hcl
+```
+
+```
+vault token create -orphan -policy=autounseal -period=24h -field=token > auto_unseal_token.local.txt
+```
+
+Run the second Vault (in a new terminal)
+
+```
+make auto-unseal-server
+```
+
+The transit seal takes its token from the `VAULT_TOKEN` environment variable. If `VAULT_ADDR` is set, the seal uses it instead of `address` from the config. That's why the make target sets both:
+
+```
+VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$(cat auto_unseal_token.local.txt) vault server -config examples/auto_unseal/vault.hcl
+```
+
+Connect to the second Vault
+
+```
+export VAULT_ADDR=http://127.0.0.1:8300
+unset VAULT_TOKEN
+```
+
+```
+vault status
+```
+
+Note `Seal Type: transit`. Initialize it
+
+```
+vault operator init -recovery-shares=1 -recovery-threshold=1 -format=json > vault_auto_unseal_init.local.json
+```
+
+```
+vault status
+```
+
+It is unsealed. No `vault operator unseal` needed.
+
+Stop the second Vault (Ctrl+C) and start it again
+
+```
+make auto-unseal-server
+```
+
+```
+vault status
+```
+
+It is unsealed again, automatically.
+
+Cleanup
+
+```
+make auto-unseal-server-clean
+```
+
+#### Cloud KMS Auto-Unseal on Kubernetes
+
+On Kubernetes, use your cloud's KMS. An example for AWS KMS is in [examples/k8s/awskms_auto_unseal.values.yml](./examples/k8s/awskms_auto_unseal.values.yml). It also uses `retry_join`, so new pods join the Raft cluster automatically, without `vault operator raft join`.
+
+Create a KMS key with the alias `vault-unseal` and an IAM user (or role) with `kms:Encrypt`, `kms:Decrypt` and `kms:DescribeKey` permissions on that key.
+
+Create a secret with the AWS credentials
+
+```
+kubectl create namespace vault
+```
+
+```
+kubectl create secret generic vault-awskms -n vault \
+  --from-literal=AWS_ACCESS_KEY_ID=... \
+  --from-literal=AWS_SECRET_ACCESS_KEY=...
+```
+
+Install Vault
+
+```
+helm upgrade --install \
+  vault \
+  --repo https://helm.releases.hashicorp.com vault \
+  --namespace vault \
+  --create-namespace \
+  -f examples/k8s/general.values.yml \
+  -f examples/k8s/awskms_auto_unseal.values.yml
+```
+
+Initialize only the first pod
+
+```
+kubectl exec -ti -n vault vault-0 -- vault operator init -format=json > vault_init.local.json
+```
+
+All pods unseal and join the cluster automatically. Delete a pod and watch it come back unsealed
+
+```
+kubectl delete pod -n vault vault-1
+```
+
+```
+kubectl exec -ti -n vault vault-1 -- vault status
+```
+
+On EKS, use IRSA or EKS Pod Identity instead of static AWS keys.
 
 ## Backup & Restore
 
