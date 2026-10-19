@@ -107,6 +107,109 @@ make docker-dev-server-shell
 
 And just run `vault status`. Everything is configured.
 
+## How Vault Works
+
+Before we store any secret, let's look at the main parts of Vault. You can see most of them in the `vault status` output above.
+
+### Storage Backend
+
+Vault does not store data itself; it uses a **storage backend**. Everything Vault writes to the storage is **encrypted**, so the storage never sees any secret in plain text.
+
+- `inmem` - in memory, used by the dev server (`Storage Type: inmem`), everything is lost on restart
+- `raft` - Integrated Storage, built into Vault, replicated between Vault nodes, recommended for production (we will use it on Kubernetes)
+- `file`, `consul`, `postgresql`, ...
+
+Docs: https://developer.hashicorp.com/vault/docs/configuration/storage
+
+### Seal / Unseal
+
+The data in the storage is encrypted by the **encryption key**. The encryption key is encrypted by the **root key** (also called the master key). Vault keeps the root key only in memory.
+
+When Vault starts, it is **sealed**. It knows where the data is, but it can't decrypt it. It can't do anything except unseal.
+
+**Unsealing** means rebuilding the root key in memory. By default (`Seal Type: shamir`), the root key is split into **key shares** using [Shamir's Secret Sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing). `vault operator init` creates 5 shares, and any 3 of them (the threshold) can rebuild the root key. You can give the shares to different people, so no one can unseal Vault alone.
+
+After a restart (or a crash, or a new pod), Vault is sealed again and **somebody has to unseal it**. That's why production setups use [auto-unseal](#auto-unseal).
+
+The dev server is initialized and unsealed automatically with only 1 key share. You can find the unseal key in the server output (`Unseal Key: ...`). If you run Vault in Docker:
+
+```
+docker logs vault-dev 2>&1 | grep 'Unseal Key'
+```
+
+Seal Vault (for example, in an emergency)
+
+```
+vault operator seal
+```
+
+```
+vault status
+```
+
+Try to do something
+
+```
+vault secrets list
+```
+
+Unseal Vault using the unseal key
+
+```
+vault operator unseal
+```
+
+```
+vault status
+```
+
+### Secrets Engines
+
+Secrets engines store, generate, or encrypt data. Each one is mounted at a path; for example, the dev server has KV v2 at `secret/`.
+
+```
+vault secrets list
+```
+
+### Auth Methods
+
+Auth methods check who you are (a username and password, an OIDC login, a Kubernetes service account, ...). If the login succeeds, they give you a **token**.
+
+```
+vault auth list
+```
+
+### Tokens
+
+**Everything in Vault is done with a token.** Every auth method just turns your identity into a token. The token has **policies** attached, which say what the token can do.
+
+The `root` token can do everything. Use it only for the initial setup.
+
+```
+vault token lookup
+```
+
+### Leases & TTLs
+
+Tokens and dynamic secrets have a **lease** with a **TTL** (time to live). When the TTL expires, Vault revokes them: it deletes the token or, for example, drops the database user. You can **renew** a lease (up to `max_ttl`) or **revoke** it early.
+
+Static KV secrets don't have leases.
+
+### Paths
+
+Everything in Vault is a path; the CLI just calls the HTTP API.
+
+- `secret/...` - KV secrets engine
+- `database/...` - Database secrets engine
+- `auth/userpass/...` - userpass auth method
+- `sys/...` - system backend (configuration of Vault itself)
+
+See the API call behind any CLI command:
+
+```
+vault secrets list -output-curl-string
+```
+
 ## Static Secrets
 
 Available commands for `vault kv <command> ...`
