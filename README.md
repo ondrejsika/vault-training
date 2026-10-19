@@ -451,6 +451,133 @@ Cleanup
 vault policy delete wrong
 ```
 
+## Auth Methods
+
+Docs: https://developer.hashicorp.com/vault/docs/auth
+
+There are auth methods for **humans** (userpass, OIDC, LDAP, GitHub, ...) and for **machines** (AppRole, Kubernetes, AWS, JWT, TLS certificates, ...).
+
+```
+vault auth list
+```
+
+### Userpass
+
+The simplest auth method for humans: a username and a password stored in Vault. It is good for demos and small setups. In a company, use OIDC (see [Vault OIDC Auth using Keycloak](#vault-oidc-auth-using-keycloak)) or LDAP instead.
+
+Enable userpass
+
+```
+vault auth enable userpass
+```
+
+Create a user
+
+```
+vault write auth/userpass/users/alice \
+  password=alice \
+  token_policies=myapp-read \
+  token_ttl=1h \
+  token_max_ttl=8h
+```
+
+```
+vault list auth/userpass/users
+```
+
+Log in as alice. The `-no-store` flag keeps your root token in `~/.vault-token`.
+
+```
+vault login -method=userpass -no-store username=alice
+```
+
+Use the token from the output
+
+```
+VAULT_TOKEN=... vault kv get secret/myapp/config
+```
+
+```
+VAULT_TOKEN=... vault token lookup
+```
+
+### AppRole
+
+Docs: https://developer.hashicorp.com/vault/docs/auth/approle
+
+AppRole is the main way **applications** (CI jobs, servers, scripts) log in to Vault when they don't run on a platform with its own auth method (like Kubernetes or AWS).
+
+The application needs two values:
+
+- **Role ID** - like a username, not secret, you can put it in the application config
+- **Secret ID** - like a password, secret, short-lived, delivered to the application separately (for example by CI or by a deployment tool)
+
+Enable AppRole
+
+```
+vault auth enable approle
+```
+
+Create a role
+
+```
+vault write auth/approle/role/myapp \
+  token_policies=myapp-read \
+  token_ttl=1h \
+  token_max_ttl=4h \
+  secret_id_ttl=24h \
+  secret_id_num_uses=10
+```
+
+Get the Role ID
+
+```
+vault read auth/approle/role/myapp/role-id
+```
+
+```
+ROLE_ID=$(vault read -field=role_id auth/approle/role/myapp/role-id)
+```
+
+Generate a Secret ID
+
+```
+vault write -f auth/approle/role/myapp/secret-id
+```
+
+```
+SECRET_ID=$(vault write -f -field=secret_id auth/approle/role/myapp/secret-id)
+```
+
+Log in as the application
+
+```
+vault write auth/approle/login role_id=$ROLE_ID secret_id=$SECRET_ID
+```
+
+```
+APP_TOKEN=$(vault write -field=token auth/approle/login role_id=$ROLE_ID secret_id=$SECRET_ID)
+```
+
+Read the secret as the application
+
+```
+VAULT_TOKEN=$APP_TOKEN vault kv get -field=db_password secret/myapp/config
+```
+
+The same login using the HTTP API (what your application does)
+
+```
+curl -s -X POST $VAULT_ADDR/v1/auth/approle/login \
+  -d "{\"role_id\":\"$ROLE_ID\",\"secret_id\":\"$SECRET_ID\"}" | jq .auth
+```
+
+List Secret ID accessors
+
+```
+vault list auth/approle/role/myapp/secret-id
+```
+
 ## Terminal UI for Vault
 
 - vaul7y - https://github.com/dkyanakiev/vaul7y
