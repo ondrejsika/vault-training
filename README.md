@@ -898,6 +898,102 @@ Check it
 vault list sys/leases/lookup/aws/creds/s3
 ```
 
+## Transit Secrets Engine
+
+Docs: https://developer.hashicorp.com/vault/docs/secrets/transit
+
+**Encryption as a service.** Vault encrypts and decrypts data, but doesn't store it. The application stores the ciphertext in its own database, and the **key never leaves Vault**.
+
+Enable transit
+
+```
+vault secrets enable transit
+```
+
+Create an encryption key
+
+```
+vault write -f transit/keys/myapp
+```
+
+```
+vault read transit/keys/myapp
+```
+
+Encrypt data (the plaintext must be base64 encoded)
+
+```
+vault write transit/encrypt/myapp plaintext=$(echo -n "my secret data" | base64)
+```
+
+```
+CIPHERTEXT=$(vault write -field=ciphertext transit/encrypt/myapp plaintext=$(echo -n "my secret data" | base64))
+echo $CIPHERTEXT
+```
+
+The ciphertext starts with `vault:v1:`, where `v1` is the version of the key.
+
+Decrypt data
+
+```
+vault write -field=plaintext transit/decrypt/myapp ciphertext=$CIPHERTEXT | base64 --decode && echo
+```
+
+### Key Rotation
+
+Rotate the key
+
+```
+vault write -f transit/keys/myapp/rotate
+```
+
+```
+vault read transit/keys/myapp
+```
+
+New data is encrypted with the new version of the key (`vault:v2:...`)
+
+```
+vault write transit/encrypt/myapp plaintext=$(echo -n "my secret data" | base64)
+```
+
+Old data still works
+
+```
+vault write -field=plaintext transit/decrypt/myapp ciphertext=$CIPHERTEXT | base64 --decode && echo
+```
+
+Rewrap old ciphertext with the latest key (Vault doesn't return the plaintext)
+
+```
+vault write transit/rewrap/myapp ciphertext=$CIPHERTEXT
+```
+
+Disable decryption with old versions of the key
+
+```
+vault write transit/keys/myapp/config min_decryption_version=2
+```
+
+```
+vault write transit/decrypt/myapp ciphertext=$CIPHERTEXT
+```
+
+### Policy for Application
+
+The application can encrypt and decrypt, but it can't read, export or rotate the key.
+
+```
+vault policy write myapp-transit - <<EOF
+path "transit/encrypt/myapp" {
+  capabilities = ["update"]
+}
+path "transit/decrypt/myapp" {
+  capabilities = ["update"]
+}
+EOF
+```
+
 ## Production Vault on Kubernetes
 
 Docs:
