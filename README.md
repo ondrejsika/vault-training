@@ -78,7 +78,7 @@ make docker-dev-server-logs
 
 ### `~/.vault-token`
 
-If you run Vault locally, your token will be automaticaly save to file `~/.vault-token`.
+If you run Vault locally, your token will be automatically saved to file `~/.vault-token`.
 
 If you run Vault from Docker, you have to create that file manually:
 
@@ -88,7 +88,7 @@ echo root > ~/.vault-token
 
 ### Test CLI / `vault status`
 
-You need to set `http://127.0.0.1:8200` to environment variable `VAULT_ADDR`.
+You need to set the environment variable `VAULT_ADDR` to `http://127.0.0.1:8200`.
 
 ```bash
 export VAULT_ADDR='http://127.0.0.1:8200'
@@ -102,7 +102,7 @@ vault status
 
 ![](./images/vault-status.png)
 
-If you run Vault in Docker and dont have Vault locally, you can connect to shell using
+If you run Vault in Docker and don't have Vault installed locally, you can connect to the container shell using
 
 ```
 make docker-dev-server-shell
@@ -119,9 +119,9 @@ Available commands for `vault kv <command> ...`
 - `enable-versioning` - Turns on versioning for an existing K/V v1 store
 - `get` - Retrieve data
 - `list` - List data or secrets
-- `metadata` -Interact with Vault's Key-Value storage
-- `patch` -Update secrets without overwriting existing secrets
-- `put` - Sets or update secrets (this replaces existing secrets)
+- `metadata` - Interact with Vault's Key-Value storage
+- `patch` - Update secrets without overwriting existing secrets
+- `put` - Set or update secrets (this replaces existing secrets)
 - `rollback` - Rolls back to a previous version of secrets
 - `undelete` - Restore the deleted version of secrets
 
@@ -253,7 +253,7 @@ vault delete secret/metadata/example/prod/env
 
 ## Dynamic Secrets
 
-## Database (Postgres)
+### Database (Postgres)
 
 Run Postgres
 
@@ -267,13 +267,13 @@ Create role `ro` (read only for all tables)
 make postgres-create-ro
 ```
 
-Enable `database` secret engine
+Enable `database` secrets engine
 
 ```
 vault secrets enable database
 ```
 
-Configure Postgress connection
+Configure Postgres connection
 
 ```
 vault write database/config/postgresql \
@@ -311,16 +311,16 @@ POSTGRES_PASSWORD=...
 slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -n postgres
 ```
 
-Wait one minute & check again:
+Wait two minutes (until the `default_ttl` expires) & check again:
 
 ```
-sleep 60
+sleep 120
 slu postgres ping -H 127.0.0.1 -P 5432 -u $POSTGRES_USER -p $POSTGRES_PASSWORD -n postgres
 ```
 
 ### AWS
 
-Enable AWS secret engine
+Enable AWS secrets engine
 
 ```
 vault secrets enable aws
@@ -333,7 +333,7 @@ export AWS_ACCESS_KEY=...
 export AWS_SECRET_KEY=...
 ```
 
-Configure the AWS provider
+Configure the AWS secrets engine
 
 ```
 vault write aws/config/root \
@@ -342,7 +342,7 @@ vault write aws/config/root \
   region=eu-central-1
 ```
 
-Create s3 role
+Create S3 role
 
 ```
 vault write aws/roles/s3 \
@@ -356,7 +356,7 @@ Get credentials
 vault read aws/creds/s3
 ```
 
-# Production Vault on Kubernetes
+## Production Vault on Kubernetes
 
 Docs:
 
@@ -449,7 +449,7 @@ List raft peers:
 vault operator raft list-peers
 ```
 
-## Unseal All Vault Pods from JSON
+### Unseal All Vault Pods from JSON
 
 ```
 kubectl exec -ti -n vault vault-0 -- vault operator unseal $(cat vault_init.local.json | jq -r '.unseal_keys_b64[0]')
@@ -467,13 +467,13 @@ kubectl exec -ti -n vault vault-2 -- vault operator unseal $(cat vault_init.loca
 
 ## Backup & Restore
 
-## Backup
+### Backup
 
 ```
 vault operator raft snapshot save backup.snap
 ```
 
-## Restore
+### Restore
 
 Create new cluster, unseal & login to it.
 
@@ -481,7 +481,7 @@ Create new cluster, unseal & login to it.
 vault operator raft snapshot restore -force backup.snap
 ```
 
-## Backup using Tergum
+### Backup using Tergum
 
 - Tergum - Backup tool - https://github.com/sikalabs/tergum
 - Blog post about backup - https://ondrej-sika.cz/blog/tergum-v0.30.0
@@ -524,32 +524,32 @@ Check if the operator is running
 kubectl get po -n vault-secrets-operator-system
 ```
 
-## Enable Kubernetes Auth
+### Enable Kubernetes Auth
 
 ```
 vault auth enable kubernetes
 ```
 
-## Configure Kubernetes Auth
+### Configure Kubernetes Auth
 
 ```
 vault write auth/kubernetes/config \
   kubernetes_host="https://kubernetes.default.svc.cluster.local:443"
 ```
 
-## Create Secret Engine
+### Create Secrets Engine
 
 ```
 vault secrets enable -path=test kv-v2
 ```
 
-## Add Secret
+### Add Secret
 
 ```
 vault kv put test/example username=foo password=bar
 ```
 
-## Create Policy
+### Create Policy
 
 ```
 vault policy write test-read - <<EOF
@@ -568,19 +568,19 @@ vault write auth/kubernetes/role/test-read \
   ttl=24h
 ```
 
-## Create Vault Auth
+### Create Vault Auth
 
 ```
 kubectl apply -f examples/vault_secrets_operator/vaultauth.yml
 ```
 
-## Create Vault Secret
+### Create Vault Secret
 
 ```
 kubectl apply -f examples/vault_secrets_operator/vaultstaticsecret.yml
 ```
 
-## Check Secret
+### Check Secret
 
 ```
 kubectl get secret example -o jsonpath='{.data.username}' | base64 --decode && echo
@@ -601,7 +601,7 @@ vault policy write reader examples/oidc/reader.hcl
 vault policy list
 ```
 
-Enable the Keycloak authentication method in Vault by running the following command:
+Enable the OIDC authentication method in Vault by running the following command:
 
 ```
 vault auth enable oidc
@@ -654,6 +654,6 @@ That's it. Do you have any questions? **Let's go for a beer!**
 - linkedin: [/in/ondrejsika/](https://linkedin.com/in/ondrejsika/)
 - Newsletter, Slack, Facebook & Linkedin Groups: <https://join.sika.io>
 
-_Do you like the course? Write me recommendation on Twitter (with handle `@ondrejsika`) and LinkedIn (add me [/in/ondrejsika](https://www.linkedin.com/in/ondrejsika/) and I'll send you request for recommendation). **Thanks**._
+_Do you like the course? Write me a recommendation on Twitter (with handle `@ondrejsika`) and LinkedIn (add me [/in/ondrejsika](https://www.linkedin.com/in/ondrejsika/) and I'll send you a request for recommendation). **Thanks**._
 
-Wanna to go for a beer or do some work together? Just [book me](https://book-me.sika.io) :)
+Want to go for a beer or do some work together? Just [book me](https://book-me.sika.io) :)
