@@ -365,7 +365,7 @@ Docs:
 Install production Vault
 
 ```
-make prod-server
+make k8s-prod-server
 ```
 
 Init
