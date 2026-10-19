@@ -1114,6 +1114,68 @@ Cleanup
 rm root_ca.local.crt pki_int.local.csr pki_int.local.crt cert.local.json
 ```
 
+## Audit Log
+
+Docs: https://developer.hashicorp.com/vault/docs/audit
+
+An audit device logs **every request and response** to Vault: who did what, on which path, and when. **You can't run Vault in production without it.**
+
+Sensitive values (tokens, secrets) are not logged in plain text. They are hashed with HMAC-SHA256, so you can search for a known value without storing it in the log.
+
+If Vault can't write to **any** enabled audit device, it stops serving requests. That's why production setups use more than one audit device.
+
+Enable the file audit device
+
+```
+vault audit enable file file_path=/tmp/vault_audit.log
+```
+
+If you run Vault in Docker, the file is inside the container, so use `make docker-dev-server-shell`.
+
+```
+vault audit list -detailed
+```
+
+Make a request
+
+```
+vault kv get secret/myapp/config
+```
+
+See the log
+
+```
+tail -n 2 /tmp/vault_audit.log | jq
+```
+
+```
+tail -n 1 /tmp/vault_audit.log | jq '{time, type, path: .request.path, operation: .request.operation, policies: .auth.policies, data: .response.data}'
+```
+
+Get the HMAC of a known value (for example, a token) and search the log for it
+
+```
+vault write sys/audit-hash/file input=root
+```
+
+```
+grep -c $(vault write -field=hash sys/audit-hash/file input=root) /tmp/vault_audit.log
+```
+
+Other audit device types: `syslog`, `socket`.
+
+On Kubernetes, the Helm chart creates a volume for audit logs (`server.auditStorage` in [examples/k8s/general.values.yml](./examples/k8s/general.values.yml)). Enable the audit device with a path on that volume:
+
+```
+vault audit enable file file_path=/vault/audit/vault_audit.log
+```
+
+Disable the audit device
+
+```
+vault audit disable file
+```
+
 ## Production Vault on Kubernetes
 
 Docs:
