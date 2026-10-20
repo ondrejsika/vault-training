@@ -14,7 +14,7 @@ docker-dev-server-down:
 	docker rm -f vault-dev
 
 postgres-up:
-	docker run --name postgres -d -e POSTGRES_PASSWORD=pg -p 5432:5432 postgres:14
+	docker run --name postgres -d -e POSTGRES_PASSWORD=pg -p 5432:5432 postgres:18
 
 postgres-create-ro:
 	docker exec -u postgres postgres psql -c "CREATE ROLE \"ro\" NOINHERIT; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"ro\";"
