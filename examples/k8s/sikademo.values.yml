@@ -3,8 +3,8 @@ server:
     tls:
     - secretName: vault-tls
       hosts:
-        - vault.k8s.sikademo.com
+        - vault.sikademo.com
     hosts:
-    - host: vault.k8s.sikademo.com
+    - host: vault.sikademo.com
       paths:
         - /
