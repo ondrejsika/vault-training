@@ -1061,6 +1061,7 @@ path "transit/decrypt/myapp" {
 EOF
 ```
 
+<!--
 ## PKI Secrets Engine
 
 Docs:
@@ -1180,6 +1181,7 @@ Cleanup
 ```
 rm root_ca.local.crt pki_int.local.csr pki_int.local.crt cert.local.json
 ```
+-->
 
 ## Audit Log
 
