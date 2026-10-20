@@ -17,6 +17,23 @@ https://developer.hashicorp.com/vault/tutorials/get-started/available-editions
 
 We will use **Vault Community** (open source).
 
+## Vault vs OpenBao
+
+- Vault - https://www.hashicorp.com/products/vault
+- OpenBao - https://openbao.org
+
+In August 2023, HashiCorp changed Vault's license from MPL 2.0 to BSL 1.1 (source available, not open source). OpenBao is a community fork of the last MPL-licensed Vault (1.14), maintained under the Linux Foundation.
+
+|                   | Vault Community               | OpenBao                    |
+| ----------------- | ----------------------------- | -------------------------- |
+| License           | BSL 1.1                       | MPL 2.0 (open source)      |
+| Owner             | HashiCorp (IBM)               | Linux Foundation           |
+| CLI               | `vault`                       | `bao`                      |
+| API               | Vault API                     | Mostly Vault API compatible |
+| Enterprise / paid | Vault Enterprise, HCP Vault   | No, everything is free     |
+
+Most of this training (concepts, CLI, API, policies, auth methods, secrets engines) applies to both. With OpenBao, just replace `vault` with `bao`.
+
 ## Run Vault Dev Server
 
 ### Local Binary
