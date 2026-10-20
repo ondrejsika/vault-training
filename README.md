@@ -1645,8 +1645,26 @@ kubectl get secret example -o jsonpath='{.data.password}' | base64 --decode && e
 vault policy write manager examples/oidc/manager.hcl
 ```
 
+Terraform
+
+```hcl
+resource "vault_policy" "manager" {
+  name   = "manager"
+  policy = file("examples/oidc/manager.hcl")
+}
+```
+
 ```
 vault policy write reader examples/oidc/reader.hcl
+```
+
+Terraform
+
+```hcl
+resource "vault_policy" "reader" {
+  name   = "reader"
+  policy = file("examples/oidc/reader.hcl")
+}
 ```
 
 ```
@@ -1659,6 +1677,8 @@ Enable the OIDC authentication method in Vault by running the following command:
 vault auth enable oidc
 ```
 
+Terraform: enabling and configuring the OIDC auth method is a single resource `vault_jwt_auth_backend`, see below.
+
 Configure the Keycloak provider by specifying the issuer URL, client ID, client secret, and any other necessary parameters. For example:
 
 ```
@@ -1669,6 +1689,21 @@ vault write auth/oidc/config \
   oidc_scope="openid profile email roles" \
   default_role="default"
 ```
+
+Terraform
+
+```hcl
+resource "vault_jwt_auth_backend" "oidc" {
+  type               = "oidc"
+  path               = "oidc"
+  oidc_discovery_url = "https://sso.sikalabs.com/realms/sikademo"
+  oidc_client_id     = "default"
+  oidc_client_secret = "default"
+  default_role       = "default"
+}
+```
+
+`oidc_scope` is not an auth method option, in Terraform set it per role using `oidc_scopes`.
 
 ```
 vault write auth/oidc/role/manager \
@@ -1681,6 +1716,32 @@ vault write auth/oidc/role/manager \
   allowed_groups="vault-manager"
 ```
 
+Terraform
+
+```hcl
+locals {
+  allowed_redirect_uris = [
+    "http://localhost:8200/ui/vault/auth/oidc/oidc/callback",
+    "http://localhost:8250/oidc/callback",
+  ]
+}
+
+resource "vault_jwt_auth_backend_role" "manager" {
+  backend               = vault_jwt_auth_backend.oidc.path
+  role_name             = "manager"
+  role_type             = "oidc"
+  bound_audiences       = ["default"]
+  allowed_redirect_uris = local.allowed_redirect_uris
+  user_claim            = "email"
+  oidc_scopes           = ["openid", "profile", "email", "roles"]
+  token_policies        = [vault_policy.manager.name]
+  groups_claim          = "groups"
+  bound_claims = {
+    groups = "vault-manager"
+  }
+}
+```
+
 ```
 vault write auth/oidc/role/default \
   bound_audiences="default" \
@@ -1688,6 +1749,21 @@ vault write auth/oidc/role/default \
   allowed_redirect_uris="http://localhost:8250/oidc/callback" \
   user_claim="email" \
   token_policies="reader"
+```
+
+Terraform
+
+```hcl
+resource "vault_jwt_auth_backend_role" "default" {
+  backend               = vault_jwt_auth_backend.oidc.path
+  role_name             = "default"
+  role_type             = "oidc"
+  bound_audiences       = ["default"]
+  allowed_redirect_uris = local.allowed_redirect_uris
+  user_claim            = "email"
+  oidc_scopes           = ["openid", "profile", "email", "roles"]
+  token_policies        = [vault_policy.reader.name]
+}
 ```
 
 ```
