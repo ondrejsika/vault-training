@@ -631,6 +631,15 @@ Enable `database` secrets engine
 vault secrets enable database
 ```
 
+Terraform
+
+```hcl
+resource "vault_mount" "database" {
+  path = "database"
+  type = "database"
+}
+```
+
 Configure Postgres connection
 
 ```
@@ -642,6 +651,22 @@ vault write database/config/postgresql \
   password="pg"
 ```
 
+Terraform
+
+```hcl
+resource "vault_database_secret_backend_connection" "postgresql" {
+  backend       = vault_mount.database.path
+  name          = "postgresql"
+  allowed_roles = ["readonly"]
+
+  postgresql {
+    connection_url = "postgresql://{{username}}:{{password}}@127.0.0.1:5432/postgres?sslmode=disable"
+    username       = "postgres"
+    password       = "pg"
+  }
+}
+```
+
 Create read-only role
 
 ```
@@ -650,6 +675,19 @@ vault write database/roles/readonly \
     creation_statements=@examples/postgres/readonly.sql \
     default_ttl=2m \
     max_ttl=24h
+```
+
+Terraform
+
+```hcl
+resource "vault_database_secret_backend_role" "readonly" {
+  backend             = vault_mount.database.path
+  name                = "readonly"
+  db_name             = vault_database_secret_backend_connection.postgresql.name
+  creation_statements = [file("examples/postgres/readonly.sql")]
+  default_ttl         = 120   # 2m
+  max_ttl             = 86400 # 24h
+}
 ```
 
 Read credentials
