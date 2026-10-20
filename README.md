@@ -722,6 +722,8 @@ Enable AWS secrets engine
 vault secrets enable aws
 ```
 
+Terraform: enabling and configuring the AWS secret engine is a single resource `vault_aws_secret_backend`, see below.
+
 Prepare AWS keys
 
 ```
@@ -738,12 +740,39 @@ vault write aws/config/root \
   region=eu-central-1
 ```
 
+Terraform
+
+```hcl
+variable "aws_access_key" {}
+variable "aws_secret_key" {
+  sensitive = true
+}
+
+resource "vault_aws_secret_backend" "aws" {
+  path       = "aws"
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
+  region     = "eu-central-1"
+}
+```
+
 Create S3 role
 
 ```
 vault write aws/roles/s3 \
   credential_type=iam_user \
   policy_document=@examples/aws/s3_policy.json
+```
+
+Terraform
+
+```hcl
+resource "vault_aws_secret_backend_role" "s3" {
+  backend         = vault_aws_secret_backend.aws.path
+  name            = "s3"
+  credential_type = "iam_user"
+  policy_document = file("examples/aws/s3_policy.json")
+}
 ```
 
 Get credentials
