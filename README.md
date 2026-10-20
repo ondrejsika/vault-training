@@ -1515,11 +1515,28 @@ kubectl get po -n vault-secrets-operator-system
 vault auth enable kubernetes
 ```
 
+Terraform
+
+```hcl
+resource "vault_auth_backend" "kubernetes" {
+  type = "kubernetes"
+}
+```
+
 ### Configure Kubernetes Auth
 
 ```
 vault write auth/kubernetes/config \
   kubernetes_host="https://kubernetes.default.svc.cluster.local:443"
+```
+
+Terraform
+
+```hcl
+resource "vault_kubernetes_auth_backend_config" "kubernetes" {
+  backend         = vault_auth_backend.kubernetes.path
+  kubernetes_host = "https://kubernetes.default.svc.cluster.local:443"
+}
 ```
 
 ### Create Secrets Engine
@@ -1528,10 +1545,32 @@ vault write auth/kubernetes/config \
 vault secrets enable -path=test kv-v2
 ```
 
+Terraform
+
+```hcl
+resource "vault_mount" "test" {
+  path = "test"
+  type = "kv-v2"
+}
+```
+
 ### Add Secret
 
 ```
 vault kv put test/example username=foo password=bar
+```
+
+Terraform
+
+```hcl
+resource "vault_kv_secret_v2" "example" {
+  mount = vault_mount.test.path
+  name  = "example"
+  data_json = jsonencode({
+    username = "foo"
+    password = "bar"
+  })
+}
 ```
 
 ### Create Policy
@@ -1544,6 +1583,20 @@ path "test/*" {
 EOF
 ```
 
+Terraform
+
+```hcl
+resource "vault_policy" "test-read" {
+  name = "test-read"
+
+  policy = <<EOT
+path "test/*" {
+  capabilities = ["read"]
+}
+EOT
+}
+```
+
 ```
 vault write auth/kubernetes/role/test-read \
   bound_service_account_names=default \
@@ -1551,6 +1604,20 @@ vault write auth/kubernetes/role/test-read \
   policies=test-read \
   audience=vault \
   ttl=24h
+```
+
+Terraform
+
+```hcl
+resource "vault_kubernetes_auth_backend_role" "test-read" {
+  backend                          = vault_auth_backend.kubernetes.path
+  role_name                        = "test-read"
+  bound_service_account_names      = ["default"]
+  bound_service_account_namespaces = ["default"]
+  token_policies                   = [vault_policy.test-read.name]
+  audience                         = "vault"
+  token_ttl                        = 86400 # 24h
+}
 ```
 
 ### Create Vault Auth
